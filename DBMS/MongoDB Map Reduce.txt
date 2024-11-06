@@ -1,4 +1,7 @@
-// Create the sales collection and insert data
+// Step 1: Create a database
+use salesDB;
+
+// Step 2: Create the sales collection and insert data
 db.sales.insertMany([
   { "_id": 1, "product": "Laptop", "quantity": 3, "price": 1000 },
   { "_id": 2, "product": "Mouse", "quantity": 5, "price": 50 },
@@ -7,26 +10,24 @@ db.sales.insertMany([
   { "_id": 5, "product": "Mouse", "quantity": 3, "price": 50 }
 ]);
 
-// Define the map function
+// Step 3: Define the map function
 var mapFunction = function() {
-  // Emit the product name as the key and the total revenue (quantity * price) as the value
-  emit(this.product, this.quantity * this.price);
+  emit(this.product, this.quantity * this.price); // Emit product as key, total revenue as value
 };
 
-// Define the reduce function
+// Step 4: Define the reduce function
 var reduceFunction = function(key, values) {
-  // Sum the revenue values for the same product
-  return Array.sum(values);
+  return Array.sum(values); // Sum all values for the same key (product)
 };
 
-// Perform the map-reduce operation
+// Step 5: Perform mapReduce operation
 db.sales.mapReduce(
   mapFunction,        // Map function
   reduceFunction,     // Reduce function
   {
-    out: "total_revenue_per_product"  // Output collection to store the results
+    out: "total_revenue_per_product"  // Output collection
   }
 );
 
-// View the results from the output collection
-db.total_revenue_per_product.find();
+// Step 6: View the results
+db.total_revenue_per_product.find(); // Fetch and display the results from the output collection
