@@ -1,108 +1,104 @@
-create table inst 
-( 
-    inst_id number(10), 
-    inst_name varchar2(20), 
-    inst_salary number(20) 
-)
+-- Create the database
+CREATE DATABASE InstituteDB;
 
-create table department 
-( 
-    dept_id number(10), 
-    dept_name varchar2(20), 
-    inst_id number(20) 
-)
+-- Use the newly created database
+USE InstituteDB;
 
-INSERT INTO inst VALUES(1,'Prachi',50000)
+-- Create 'inst' table
+CREATE TABLE inst (
+    inst_id INT(10),
+    inst_name VARCHAR(20),
+    inst_salary DECIMAL(20, 2)
+);
 
-INSERT INTO inst VALUES(2,'Apurva',51000)
+-- Create 'department' table
+CREATE TABLE department (
+    dept_id INT(10),
+    dept_name VARCHAR(20),
+    inst_id INT(10)
+);
 
-INSERT INTO inst VALUES(3,'Sayali',52000)
+-- Insert values into 'inst' table
+INSERT INTO inst VALUES 
+    (1, 'Prachi', 50000),
+    (2, 'Apurva', 51000),
+    (3, 'Sayali', 52000),
+    (4, 'Sakshi', 55000),
+    (5, 'Tanaya', 40000),
+    (6, 'Aarya', 30000),
+    (7, 'Rutuja', 60000),
+    (8, 'Aakansha', 40000),
+    (9, 'Tahseen', 45000),
+    (10, 'Apurva', 50000),
+    (11, 'Kanishka', 20000),
+    (12, 'Aditi', 45000),
+    (13, 'Shubham', 30000);
 
-INSERT INTO inst VALUES(4,'Sakshi',55000)
+-- Insert values into 'department' table
+INSERT INTO department VALUES 
+    (111, 'Computer', 1),
+    (222, 'IT', 2),
+    (333, 'Electrical', 3),
+    (444, 'Mechanical', 4),
+    (555, 'Civil', 5),
+    (666, 'AIML', 6),
+    (777, 'AIDS', 7),
+    (888, 'ECE', 8),
+    (999, 'ENTC', 9);
 
-INSERT INTO inst VALUES(5,'Tanaya',40000)
+-- Query to view all records in 'inst' table
+SELECT * FROM inst;
 
-INSERT INTO inst VALUES(6,'Aarya',30000)
+-- Query to view all records in 'department' table
+SELECT * FROM department;
 
-INSERT INTO inst VALUES(7,'Rutuja',60000)
+-- INNER JOIN to show matching records in both tables
+SELECT * FROM inst INNER JOIN department ON inst.inst_id = department.inst_id;
 
-INSERT INTO inst VALUES(8,'Aakansha',40000)
+-- LEFT JOIN to show all records from 'inst' and matching from 'department'
+SELECT * FROM inst LEFT JOIN department ON inst.inst_id = department.inst_id;
 
-INSERT INTO inst VALUES(9,'Tahseen',45000)
+-- RIGHT JOIN to show all records from 'department' and matching from 'inst'
+SELECT * FROM department RIGHT JOIN inst ON inst.inst_id = department.inst_id;
 
-INSERT INTO inst VALUES(10,'Apurva',50000)
+-- FULL OUTER JOIN using UNION of LEFT and RIGHT JOIN
+SELECT * FROM inst LEFT JOIN department ON inst.inst_id = department.inst_id
+UNION
+SELECT * FROM inst RIGHT JOIN department ON inst.inst_id = department.inst_id;
 
-INSERT INTO inst VALUES(11,'Kanishka',20000)
+-- Query to find instructor with the highest salary
+SELECT inst_name FROM inst WHERE inst_salary = (SELECT MAX(inst_salary) FROM inst);
 
-INSERT INTO inst VALUES(12,'Aditi',45000)
+-- Query to find instructors associated with a department
+SELECT inst_name FROM inst WHERE inst_id IN (SELECT inst_id FROM department);
 
-INSERT INTO inst VALUES(13,'Shubham',30000)
+-- Create a view 'inst_view' for instructors with salary > 50000
+CREATE VIEW inst_view AS SELECT inst_name, inst_salary FROM inst WHERE inst_salary > 50000;
 
-Select * from inst
+-- Query to view the 'inst_view'
+SELECT * FROM inst_view;
 
-INSERT INTO department VALUES(111,'Computer',1)
+-- Update salary directly in 'inst' table since views are non-updatable in MySQL
+UPDATE inst SET inst_salary = 55000 WHERE inst_name = 'Sakshi';
 
-INSERT INTO department VALUES(222,'IT',2)
+-- Query to view updated 'inst_view'
+SELECT * FROM inst_view;
 
-INSERT INTO department VALUES(333,'Electrical',3)
+-- Recreate the view with different conditions
+CREATE OR REPLACE VIEW inst_view AS SELECT inst_id, inst_name, inst_salary FROM inst WHERE inst_salary > 40000;
 
-INSERT INTO department VALUES(444,'Mechanical',4)
+-- Query to view the modified 'inst_view'
+SELECT * FROM inst_view;
 
-INSERT INTO department VALUES(555,'Civil',5)
+-- Additional queries for analysis
+SELECT DISTINCT dept_name FROM department;
 
-INSERT INTO department VALUES(666,'AIML',6)
+SELECT AVG(inst_salary) AS avg_salary FROM inst;
 
-INSERT INTO department VALUES(777,'AIDS',7)
+SELECT COUNT(inst_name) FROM inst INNER JOIN department ON inst.inst_id = department.inst_id WHERE dept_name = 'IT';
 
-INSERT INTO department VALUES(888,'ECE',8)
+SELECT COUNT(inst_id) FROM department WHERE dept_name = 'IT';
 
-INSERT INTO department VALUES(999,'ENTC',9)
+SELECT SUM(inst_salary) AS total_salary FROM inst INNER JOIN department ON inst.inst_id = department.inst_id WHERE dept_name = 'Computer';
 
-Select * from department
-
-Select * from inst INNER JOIN department ON inst.inst_id=department.inst_id
-
-Select * from inst LEFT JOIN department ON inst.inst_id=department.inst_id
-
-Select * from department LEFT JOIN inst ON inst.inst_id=department.inst_id
-
-Select * from department RIGHT JOIN inst ON inst.inst_id=department.inst_id
-
-Select * from department FULL JOIN inst ON inst.inst_id=department.inst_id
-
-select inst_name from inst where inst_salary=(select max(inst_salary) from inst)
-
-select inst_name from inst where inst_id  in (select inst_id from department)
-
-create view inst_view as select inst_name,inst_salary from inst where inst_salary>50000
-
-select * from inst_view
-
-UPDATE inst_view SET inst_salary=55000 WHERE inst_name='Sakshi'
-
-select * from inst_view
-
-CREATE OR REPLACE view inst_view AS SELECT inst_id,inst_name,inst_salary FROM inst WHERE inst_salary >40000
-
-select * from inst_view
-
-select distinct dept_name 
-from department
-
-select avg(inst_salary) 
-from inst
-
-select count(inst_name) 
-from inst,department 
-where dept_name='IT'
-
-select count(inst_id) 
-from department 
-where dept_name='IT'
-
-select sum(inst_salary) 
-from department,inst 
-where dept_name='Computer'
-
-select sum(inst_salary) 
-from inst,department
+SELECT SUM(inst_salary) AS total_salary FROM inst;
