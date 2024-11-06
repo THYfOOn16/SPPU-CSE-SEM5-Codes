@@ -1,19 +1,55 @@
-create table circle(Radius number,Area number)
+CREATE DATABASE prac5;
+USE prac5;
 
-Declare 
-  rad number; 
-  area number; 
-Begin 
-	for rad in 5..9 loop 
-	area := 3.14*POWER(rad,2); 
-    insert into circle(Radius,Area) 
-	Values(rad,area); 
- 
-END LOOP; 
-COMMIT; 
-	Dbms_Output.Put_Line('RADIUS | AREA'); 
-	Dbms_Output.Put_Line('_____________'); 
-	for shu in (select Radius,Area from circle) LOOP 
-		Dbms_output.put_line(shu.Radius || '   |   ' || shu.Area); 
-	END loop; 
-END; 
+CREATE TABLE areas (
+    radius INT,
+    area DECIMAL(10,2)
+);
+
+DELIMITER $$
+
+CREATE PROCEDURE CalculateCircleAreas()
+BEGIN
+    -- Declare variables
+    DECLARE v_radius INT DEFAULT 5;
+    DECLARE v_area DECIMAL(10,2);
+    DECLARE pi_value DECIMAL(10,2) DEFAULT 3.14;
+   
+    -- Declare handler for any SQL exceptions
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'An error occurred during calculation and storage' AS message;
+    END;
+   
+    -- Start transaction
+    START TRANSACTION;
+   
+    -- Loop to calculate areas for radius 5 to 9
+    WHILE v_radius <= 9 DO
+        -- Calculate area using the formula πr²
+        SET v_area = pi_value * v_radius * v_radius;
+       
+        -- Insert the radius and calculated area into the areas table
+        INSERT INTO areas (radius, area)
+        VALUES (v_radius, v_area);
+       
+        -- Increment radius
+        SET v_radius = v_radius + 1;
+    END WHILE;
+   
+    -- If everything is successful, commit the transaction
+    COMMIT;
+   
+    -- Display the results
+    SELECT * FROM areas;
+   
+END $$
+
+DELIMITER ;
+
+-- Execute the procedure
+CALL CalculateCircleAreas();
+
+-- View the results
+SELECT * FROM areas;
