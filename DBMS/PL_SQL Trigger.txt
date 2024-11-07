@@ -1,59 +1,151 @@
-create table library( 
-book_id int primary key, 
-book_name varchar(25), 
-author_name varchar(40), 
-price int 
-); 
+-- Create the database
+CREATE DATABASE prac8;
+USE prac8;
 
-insert into library(book_id, book_name, author_name, price) 
-values(1,'early india','ramila thapar',1200);
+-- Create the main Library table
+CREATE TABLE Library (
+    book_id INT PRIMARY KEY,
+    title VARCHAR(200),
+    author VARCHAR(100),
+    status VARCHAR(50),
+    issued_to INT,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-insert into library(book_id, book_name, author_name, price) 
-values(2,'verity','collen hoover',1600);
+-- Create the audit table
+CREATE TABLE Library_Audit (
+    audit_id INT PRIMARY KEY AUTO_INCREMENT,
+    book_id INT,
+    action_type VARCHAR(20),
+    old_title VARCHAR(200),
+    old_author VARCHAR(100),
+    old_status VARCHAR(50),
+    old_issued_to INT,
+    changed_by VARCHAR(100),
+    change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-insert into library(book_id, book_name, author_name, price) 
-values(3,'Nelson mandela','Hovely reads',900);
+DELIMITER $$
 
-insert into library(book_id, book_name, author_name, price) 
-values(4,'everyday gita','sunita pant',1500); 
+-- 1. BEFORE UPDATE Trigger (Row Level)
+CREATE TRIGGER before_library_update
+BEFORE UPDATE ON Library
+FOR EACH ROW
+BEGIN
+    -- Validate new status
+    IF NEW.status NOT IN ('Available', 'Issued', 'Lost', 'Under Repair') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Invalid book status. Allowed values are: Available, Issued, Lost, Under Repair';
+    END IF;
+   
+    -- Set last updated timestamp
+    SET NEW.last_updated = CURRENT_TIMESTAMP;
+END $$
 
-insert into library(book_id, book_name, author_name, price) 
-values(5,'b1','a1',2000); 
+-- 2. AFTER UPDATE Trigger (Row Level)
+CREATE TRIGGER after_library_update
+AFTER UPDATE ON Library
+FOR EACH ROW
+BEGIN
+    -- Insert old values into audit table
+    INSERT INTO Library_Audit (
+        book_id,
+        action_type,
+        old_title,
+        old_author,
+        old_status,
+        old_issued_to,
+        changed_by
+    )
+    VALUES (
+        OLD.book_id,
+        'UPDATE',
+        OLD.title,
+        OLD.author,
+        OLD.status,
+        OLD.issued_to,
+        CURRENT_USER()
+    );
+END $$
 
-create table library_audit( 
-old_book_id int primary key, 
-old_book_name varchar(25), 
-old_author_name varchar(40), 
-old_price int, 
-operation_type varchar(20)
-); 
+-- 3. BEFORE DELETE Trigger (Row Level)
+CREATE TRIGGER before_library_delete
+BEFORE DELETE ON Library
+FOR EACH ROW
+BEGIN
+    -- Validate if book can be deleted
+    IF OLD.status = 'Issued' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Cannot delete a book that is currently issued';
+    END IF;
+END $$
 
-create or replace trigger before_library_update 
-before  
-update on library 
-for each row 
-begin  
-insert into 
-library_audit(old_book_id,old_book_name,old_author_name,old_price,operation_type) 
-values(:OLD.book_id, :OLD.book_name, :OLD.author_name, :OLD.price, 'update'); 
-end;
+-- 4. AFTER DELETE Trigger (Row Level)
+CREATE TRIGGER after_library_delete
+AFTER DELETE ON Library
+FOR EACH ROW
+BEGIN
+    -- Insert deleted record into audit table
+    INSERT INTO Library_Audit (
+        book_id,
+        action_type,
+        old_title,
+        old_author,
+        old_status,
+        old_issued_to,
+        changed_by
+    )
+    VALUES (
+        OLD.book_id,
+        'DELETE',
+        OLD.title,
+        OLD.author,
+        OLD.status,
+        OLD.issued_to,
+        CURRENT_USER()
+    );
+END $$
 
-UPDATE Library  
-SET book_name = 'Gatsby (Updated)', author_name = 'Fitzgerald'  
+-- 5. BEFORE INSERT Trigger (Row Level)
+CREATE TRIGGER before_library_insert
+BEFORE INSERT ON Library
+FOR EACH ROW
+BEGIN
+    -- Set default status if not provided
+    IF NEW.status IS NULL THEN
+        SET NEW.status = 'Available';
+    END IF;
+   
+    -- Validate status
+    IF NEW.status NOT IN ('Available', 'Issued', 'Lost', 'Under Repair') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Invalid book status. Allowed values are: Available, Issued, Lost, Under Repair';
+    END IF;
+END $$
+
+DELIMITER ;
+
+-- 1. Insert test data
+INSERT INTO Library (book_id, title, author, status) VALUES
+(1, 'Database Management', 'John Doe', 'Available'),
+(2, 'Python Programming', 'Jane Smith', 'Available'),
+(3, 'Web Development', 'Bob Wilson', 'Available');
+
+-- 2. Test UPDATE trigger
+UPDATE Library
+SET status = 'Issued', issued_to = 101
 WHERE book_id = 1;
 
-create or replace trigger before_library_delete 
-before  
-delete on library 
-for each row 
-begin  
-insert into 
-library_audit(old_book_id,old_book_name,old_author_name,old_price,operation_type) 
-values(:OLD.book_id, :OLD.book_name, :OLD.author_name, :OLD.price, 'delete'); 
-end;
-
+-- 3. Test DELETE trigger
 DELETE FROM Library WHERE book_id = 2;
 
-select* from library_audit
+-- 4. Test invalid status (should fail)
+UPDATE Library
+SET status = 'Invalid Status'
+WHERE book_id = 3;
 
-select* from library
+-- 5. Test deletion of issued book (should fail)
+DELETE FROM Library WHERE book_id = 1;
+
+-- Check audit records
+SELECT * FROM Library_Audit ORDER BY audit_id DESC;
