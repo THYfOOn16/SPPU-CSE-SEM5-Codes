@@ -1,54 +1,208 @@
-CREATE TABLE Student ( 
-    Student_ID INT PRIMARY KEY, 
-    Student_Name VARCHAR(100), 
-    Marks INT, 
-    Category VARCHAR2(20)  
+CREATE DATABASE prac7;
+USE prac7;
+
+-- Create the required tables
+CREATE TABLE O_RollCall (
+    Roll_No INT PRIMARY KEY,
+    Name VARCHAR(100),
+    Class VARCHAR(50)
 );
 
-INSERT INTO Student (Student_ID, Student_Name, Marks) 
-VALUES (1, 'John Doe', 1200);
+CREATE TABLE N_RollCall (
+    Roll_No INT PRIMARY KEY,
+    Name VARCHAR(100),
+    Class VARCHAR(50)
+);
 
-INSERT INTO Student (Student_ID, Student_Name, Marks) 
-VALUES (2, 'Jane Smith', 950);
+DELIMITER $$
 
-INSERT INTO Student (Student_ID, Student_Name, Marks) 
-VALUES (3, 'Emily Johnson', 880);
+-- Procedure 1: Merge Roll Call using parameterized class input
+CREATE PROCEDURE MergeRollCallParam(
+    IN p_class VARCHAR(50)
+)
+BEGIN
+    -- Declare variables
+    DECLARE v_roll INT;
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_class VARCHAR(50);
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_count INT;
 
-INSERT INTO Student (Student_ID, Student_Name, Marks) 
-VALUES (4, 'Michael Brown', 800);
+    -- Declare cursor for new records in N_RollCall
+    DECLARE cur_new_records CURSOR FOR
+        SELECT Roll_No, Name, Class
+        FROM N_RollCall
+        WHERE Class = p_class;
 
-CREATE OR REPLACE FUNCTION CategorizeMarks(marks INT) RETURN VARCHAR2 IS 
-    v_category VARCHAR2(20); 
-BEGIN 
-    IF marks BETWEEN 999 AND 1500 THEN 
-        v_category := 'Distinction'; 
-    ELSIF marks BETWEEN 900 AND 998 THEN 
-        v_category := 'First Class'; 
-    ELSIF marks BETWEEN 825 AND 899 THEN 
-        v_category := 'Second Class'; 
-    ELSE 
-        v_category := 'Pass'; 
-    END IF; 
-    RETURN v_category; 
-EXCEPTION 
-    WHEN OTHERS THEN 
-        RETURN 'Error'; 
-END;
-/
+    -- Declare handler for cursor closure
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
 
-CREATE OR REPLACE PROCEDURE UpdateStudentCategory IS 
-BEGIN 
-    FOR rec IN (SELECT Student_ID, Marks FROM Student) LOOP 
-        UPDATE Student 
-        SET Category = CategorizeMarks(rec.Marks) 
-        WHERE Student_ID = rec.Student_ID; 
-    END LOOP; 
-     
-    COMMIT; 
-END;
+    -- Declare handler for SQL errors
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'An error occurred during merge operation' AS message;
+    END;
 
-BEGIN 
-    UpdateStudentCategory; 
-END;
+    -- Start transaction
+    START TRANSACTION;
 
-Select* from Student
+    -- Open cursor
+    OPEN cur_new_records;
+
+    -- Loop through the cursor to process records
+    merge_loop: LOOP
+        FETCH cur_new_records INTO v_roll, v_name, v_class;
+
+        IF v_done THEN
+            LEAVE merge_loop;
+        END IF;
+
+        -- Check if the record exists in O_RollCall
+        SELECT COUNT(*) INTO v_count
+        FROM O_RollCall
+        WHERE Roll_No = v_roll;
+
+        -- Insert if record doesn't exist
+        IF v_count = 0 THEN
+            INSERT INTO O_RollCall(Roll_No, Name, Class)
+            VALUES (v_roll, v_name, v_class);
+        END IF;
+    END LOOP;
+
+    CLOSE cur_new_records;
+
+    COMMIT;
+
+    -- Show message with the class that was merged
+    SELECT CONCAT('Records merged for class: ', p_class) AS message;
+END $$
+
+
+-- Procedure 2: Merge Roll Call using explicit cursor
+CREATE PROCEDURE MergeRollCallExplicit()
+BEGIN
+    -- Declare variables
+    DECLARE v_roll INT;
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_class VARCHAR(50);
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_count INT;
+
+    -- Declare explicit cursor
+    DECLARE cur_all_records CURSOR FOR
+        SELECT Roll_No, Name, Class
+        FROM N_RollCall;
+
+    -- Declare handler for cursor closure
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+
+    -- Start transaction
+    START TRANSACTION;
+
+    -- Open cursor
+    OPEN cur_all_records;
+
+    -- Loop through the cursor to process records
+    fetch_loop: LOOP
+        FETCH cur_all_records INTO v_roll, v_name, v_class;
+
+        IF v_done THEN
+            LEAVE fetch_loop;
+        END IF;
+
+        -- Check if the record exists
+        SELECT COUNT(*) INTO v_count
+        FROM O_RollCall
+        WHERE Roll_No = v_roll;
+
+        -- Insert if record doesn't exist
+        IF v_count = 0 THEN
+            INSERT INTO O_RollCall(Roll_No, Name, Class)
+            VALUES (v_roll, v_name, v_class);
+        END IF;
+    END LOOP;
+
+    CLOSE cur_all_records;
+
+    COMMIT;
+END $$
+
+
+-- Procedure 3: Merge Roll Call using a FOR loop (simulated with INSERT...SELECT)
+CREATE PROCEDURE MergeRollCallForLoop()
+BEGIN
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_count INT;
+
+    -- Start transaction
+    START TRANSACTION;
+
+    -- Insert missing records into O_RollCall using INSERT...SELECT
+    INSERT INTO O_RollCall (Roll_No, Name, Class)
+    SELECT n.Roll_No, n.Name, n.Class
+    FROM N_RollCall n
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM O_RollCall o
+        WHERE o.Roll_No = n.Roll_No
+    );
+
+    COMMIT;
+END $$
+
+
+-- Procedure 4: Merge Roll Call using implicit cursor (simple INSERT...SELECT)
+CREATE PROCEDURE MergeRollCallImplicit()
+BEGIN
+    DECLARE v_rows_affected INT;
+
+    -- Start transaction
+    START TRANSACTION;
+
+    -- Insert missing records into O_RollCall using INSERT...SELECT
+    INSERT INTO O_RollCall (Roll_No, Name, Class)
+    SELECT n.Roll_No, n.Name, n.Class
+    FROM N_RollCall n
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM O_RollCall o
+        WHERE o.Roll_No = n.Roll_No
+    );
+
+    -- Get number of rows affected
+    SET v_rows_affected = ROW_COUNT();
+
+    COMMIT;
+
+    -- Return the number of rows merged
+    SELECT CONCAT(v_rows_affected, ' records merged') AS result;
+END $$
+
+DELIMITER ;
+
+-- Insert test data into O_RollCall and N_RollCall
+INSERT INTO O_RollCall VALUES
+(1, 'John Doe', 'Class A'),
+(2, 'Jane Smith', 'Class A');
+
+INSERT INTO N_RollCall VALUES
+(1, 'John Doe', 'Class A'),
+(2, 'Jane Smith', 'Class A'),
+(3, 'Bob Wilson', 'Class A'),
+(4, 'Alice Brown', 'Class B');
+
+-- Call the MergeRollCallParam procedure for Class A
+CALL MergeRollCallParam('Class A');
+
+-- Check results
+SELECT * FROM O_RollCall ORDER BY Roll_No;
+
+-- Test with empty class (Class C does not exist)
+CALL MergeRollCallParam('Class C');
+
+-- Test with existing class (Class B)
+CALL MergeRollCallParam('Class B');
+
+-- Check final results
+SELECT * FROM O_RollCall ORDER BY Roll_No;
