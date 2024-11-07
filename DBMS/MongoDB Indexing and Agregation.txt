@@ -1,44 +1,64 @@
-db.orders.insertMany([
+// Create the "sales" collection and insert documents
+db.createCollection("sales");
+
+db.sales.insertMany([
+  { product_id: "P1111", customer_id: "C101", quantity: 4, price: 25, sale_date: ISODate("2023-10-05T09:00:00Z"), region: "North America" },
+  { product_id: "P2222", customer_id: "C102", quantity: 2, price: 60, sale_date: ISODate("2023-10-07T14:30:00Z"), region: "Europe" },
+  { product_id: "P3333", customer_id: "C103", quantity: 1, price: 100, sale_date: ISODate("2023-10-10T11:00:00Z"), region: "Asia" },
+  { product_id: "P4444", customer_id: "C104", quantity: 3, price: 45, sale_date: ISODate("2023-10-12T13:15:00Z"), region: "North America" },
+  { product_id: "P5555", customer_id: "C105", quantity: 5, price: 20, sale_date: ISODate("2023-10-15T16:45:00Z"), region: "Europe" },
+  { product_id: "P6666", customer_id: "C106", quantity: 2, price: 75, sale_date: ISODate("2023-10-17T10:30:00Z"), region: "North America" },
+  { product_id: "P7777", customer_id: "C107", quantity: 1, price: 120, sale_date: ISODate("2023-10-19T08:00:00Z"), region: "Asia" },
+  { product_id: "P8888", customer_id: "C108", quantity: 3, price: 30, sale_date: ISODate("2023-10-22T19:00:00Z"), region: "Europe" },
+  { product_id: "P9999", customer_id: "C109", quantity: 2, price: 55, sale_date: ISODate("2023-10-25T15:30:00Z"), region: "North America" },
+  { product_id: "P1010", customer_id: "C110", quantity: 4, price: 35, sale_date: ISODate("2023-10-28T12:00:00Z"), region: "Europe" },
+  { product_id: "P2020", customer_id: "C111", quantity: 1, price: 150, sale_date: ISODate("2023-10-30T09:00:00Z"), region: "Asia" }
+]);
+
+// View the inserted documents
+db.sales.find().pretty();
+
+// Create indexes on sale_date and region, sale_date
+db.sales.createIndex({ sale_date: 1 });
+db.sales.createIndex({ region: 1, sale_date: -1 });
+
+// Aggregation to get total sales per region
+db.sales.aggregate([
   {
-    "_id": 1,
-    "customer": "John Doe",
-    "items": [
-      { "product": "Laptop", "quantity": 1, "price": 1000 },
-      { "product": "Mouse", "quantity": 2, "price": 50 }
-    ],
-    "total": 1100
+    $match: {
+      sale_date: { $gte: ISODate("2023-10-01T00:00:00Z"), $lt: ISODate("2023-11-01T00:00:00Z") }
+    }
   },
   {
-    "_id": 2,
-    "customer": "Jane Smith",
-    "items": [
-      { "product": "Laptop", "quantity": 1, "price": 1000 },
-      { "product": "Keyboard", "quantity": 1, "price": 150 }
-    ],
-    "total": 1150
+    $addFields: {
+      total_amount: { $multiply: ["$quantity", "$price"] }
+    }
+  },
+  {
+    $group: {
+      _id: "$region",
+      total_sales: { $sum: "$total_amount" }
+    }
+  },
+  {
+    $sort: { total_sales: -1 }
   }
 ]);
 
-db.orders.aggregate([
-  { $unwind: "$items" },  // Unwind the items array
-  { $group: {
-      _id: "$items.product",  // Group by product name
-      totalQuantity: { $sum: "$items.quantity" },  // Sum of quantity sold
-      totalRevenue: { $sum: { $multiply: [ "$items.quantity", "$items.price" ] } }  // Calculate total revenue
-  }},
-  { $sort: { totalRevenue: -1 } }  // Sort by total revenue in descending order
+// Aggregation to get average sales per region
+db.sales.aggregate([
+  {
+    $addFields: {
+      total_amount: { $multiply: ["$quantity", "$price"] }
+    }
+  },
+  {
+    $group: {
+      _id: "$region",
+      average_sales: { $avg: "$total_amount" }
+    }
+  },
+  {
+    $sort: { average_sales: -1 }
+  }
 ]);
-
-db.customers.insertMany([
-  { "_id": 1, "name": "John Doe", "age": 25, "location": "New York" },
-  { "_id": 2, "name": "Jane Smith", "age": 30, "location": "London" },
-  { "_id": 3, "name": "Bob Johnson", "age": 22, "location": "Sydney" }
-]);
-
-db.customers.createIndex({ age: 1 });
-
-db.customers.find({ age: { $gt: 25 } });
-
-db.customers.createIndex({ name: 1, age: -1 });// Compound index on `name` (ascending) and `age` (descending)
-
-db.customers.find({ name: "John Doe", age: { $gt: 20 } });
