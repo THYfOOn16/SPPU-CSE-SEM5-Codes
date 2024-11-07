@@ -1,4 +1,6 @@
 db.createCollection("library");
+
+// Insert documents into the library collection
 db.library.insert({"bid":1,"name":"dbms"});
 db.library.insert({"bid":2,"name":"Toc","author":"XYZ"});
 db.library.insert({"bid":3,"name":"CN","author":"ABCD","cost":700});
@@ -6,16 +8,30 @@ db.library.insert({"bid":4,"name":"OOP","author":"Addison-Wesley","cost":400});
 db.library.insert({"bid":5,"name":"SPOS","author":"PQR","cost":500});
 db.library.insert({"bid":6,"name":"AI","author":"SSC Education","cost":800});
 db.library.insert({"bid":7,"name":"C++","author":"MD Publications","cost":400});
+
+// Find all documents and pretty print
 db.library.find().pretty();
 
+// Update documents with cost 400 to cost 600
 db.library.update({'cost':400},{$set:{'cost':600}});
 
+// Update one document with cost greater than 600 to cost 900
 db.library.updateOne({'cost':{$gt:600}},{$set:{'cost':900}});
 
+// Find all documents and pretty print after updates
 db.library.find().pretty();
-db.library.find({"cost":{$not:{$gt:800}}});
-db.library.find().sort({"bid":1});
-db.library.find({$or:[{"cost":500},{"cost":800}]}).pretty();
-db.library.count();
 
+// Find documents where cost is not greater than 800
+db.library.find({"cost":{$not:{$gt:800}}});
+
+// Sort documents by bid in ascending order
+db.library.find().sort({"bid":1});
+
+// Find documents where cost is either 500 or 800
+db.library.find({$or:[{"cost":500},{"cost":800}]}).pretty();
+
+// Count the number of documents in the collection
+db.library.countDocuments();
+
+// Remove document with bid 1
 db.library.remove({"bid":1});
