@@ -1,33 +1,133 @@
-CREATE TABLE stud_marks(name VARCHAR2(25),total_marks NUMBER)
+-- Step 1: Create and switch to the database
+CREATE DATABASE IF NOT EXISTS prac6;
+USE prac6;
 
-CREATE TABLE result(roll_number NUMBER , name VARCHAR2(25), class VARCHAR2(30))
+-- Step 2: Create tables with primary and foreign keys
+CREATE TABLE IF NOT EXISTS Stud_Marks (
+    Roll INT PRIMARY KEY AUTO_INCREMENT,
+    Name VARCHAR(100) NOT NULL,
+    total_marks INT NOT NULL
+);
 
-CREATE OR REPLACE PROCEDURE proc_grades ( roll_no IN NUMBER, name IN VARCHAR2 ,marks IN NUMBER)  
-AS    
-BEGIN 
-    IF (marks<=1500 and marks>=990) THEN  
-    DBMS_OUTPUT.PUT_LINE (roll_no||' - '||name||' : DISTINCTION');  
-	    INSERT INTO result VALUES (roll_no,name,'DISTINCTION');  
-	    ELSIF (marks<=989 and marks>=900) THEN 
-    DBMS_OUTPUT.PUT_LINE (roll_no||' - '||name||' : FIRST CLASS'); 
-    INSERT INTO result VALUES (roll_no,name,'FIRST CLASS'); 
-    ELSIF (marks<=899 and marks>825) THEN          
-    DBMS_OUTPUT.PUT_LINE(roll_no||' - '||name||' : HIGHER SECOND CLASS');  
-    INSERT INTO result VALUES (roll_no,name,'HIGHER SECOND CLASS'); 
-    ELSE 
-    DBMS_OUTPUT.PUT_LINE (roll_no||' - '||name||' : FAIL');  
-    INSERT INTO result VALUES (roll_no,name,'FAIL'); 
-    END IF; 
-    INSERT INTO stud_marks VALUES (name,marks); 
-END proc_grades ;
+CREATE TABLE IF NOT EXISTS Result (
+    Roll INT,
+    Name VARCHAR(100) NOT NULL,
+    Class VARCHAR(50),
+    FOREIGN KEY (Roll) REFERENCES Stud_Marks(Roll)
+);
 
-BEGIN 
-proc_grades (54,'SUDARSHAN',1000); 
-proc_grades (46,'ARYAN ',950); 
-proc_grades (58,'ARJUN ',1050); 
-proc_grades (14,'Aanika',995); 
-proc_grades (19,'Suhani',889); 
-proc_grades (16,'Kartiki',965); 
-proc_grades (10,'Shalima',900); 
-proc_grades (20,'Kusum',777); 
-END;
+-- Step 3: Begin defining the procedure to calculate grades
+DELIMITER $$
+
+CREATE PROCEDURE proc_Grade()
+BEGIN
+    -- Variable declarations for storing cursor data and grade values
+    DECLARE v_roll INT;
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_marks INT;
+    DECLARE v_class VARCHAR(50);
+    DECLARE v_done INT DEFAULT FALSE;
+   
+    -- Cursor for selecting student records from Stud_Marks
+    DECLARE stud_cursor CURSOR FOR
+        SELECT Roll, Name, total_marks
+        FROM Stud_Marks;
+   
+    -- Handlers to manage cursor completion and any SQL errors
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;  -- Roll back transaction if an error occurs
+        SELECT 'An error occurred during grade calculation' AS message;
+    END;
+   
+    -- Start transaction to ensure atomicity
+    START TRANSACTION;
+   
+    -- Open cursor to begin iterating over Stud_Marks records
+    OPEN stud_cursor;
+   
+    -- Grading loop to fetch each record and assign a grade
+    grade_loop: LOOP
+        -- Fetch the next student record into variables
+        FETCH stud_cursor INTO v_roll, v_name, v_marks;
+       
+        -- Exit loop if no more records are available
+        IF v_done THEN
+            LEAVE grade_loop;
+        END IF;
+       
+        -- Determine grade based on total marks using CASE statement
+        SET v_class = CASE
+            WHEN v_marks >= 990 AND v_marks <= 1500 THEN 'Distinction'
+            WHEN v_marks >= 900 AND v_marks <= 989 THEN 'First Class'
+            WHEN v_marks >= 825 AND v_marks <= 899 THEN 'Higher Second Class'
+            ELSE 'No Grade'
+        END;
+       
+        -- Insert result into Result table with calculated grade
+        INSERT INTO Result (Roll, Name, Class)
+        VALUES (v_roll, v_name, v_class);
+       
+    END LOOP;
+   
+    -- Close the cursor after all records are processed
+    CLOSE stud_cursor;
+   
+    -- Commit transaction to save all changes
+    COMMIT;
+   
+    -- Display results after grade calculation
+    SELECT R.Roll, R.Name, R.Class, SM.total_marks
+    FROM Result R
+    JOIN Stud_Marks SM ON R.Roll = SM.Roll
+    ORDER BY SM.total_marks DESC;
+   
+END $$
+
+-- Step 4: Create a helper function to calculate grade for a single student
+CREATE FUNCTION func_GetGrade(p_marks INT)
+RETURNS VARCHAR(50)
+DETERMINISTIC
+BEGIN
+    DECLARE v_grade VARCHAR(50);
+   
+    SET v_grade = CASE
+        WHEN p_marks >= 990 AND p_marks <= 1500 THEN 'Distinction'
+        WHEN p_marks >= 900 AND p_marks <= 989 THEN 'First Class'
+        WHEN p_marks >= 825 AND p_marks <= 899 THEN 'Higher Second Class'
+        ELSE 'No Grade'
+    END;
+   
+    RETURN v_grade;
+END $$
+
+DELIMITER ;
+
+-- Step 5: Clear previous results from Result table
+TRUNCATE TABLE Result;
+
+-- Step 6: Insert sample data into Stud_Marks
+INSERT INTO Stud_Marks (Name, total_marks) VALUES
+('John Doe', 1100),
+('Jane Smith', 950),
+('Alice Johnson', 850),
+('Bob Brown', 820);
+
+-- Step 7: Call the procedure to calculate grades for all students
+CALL proc_Grade();
+
+-- Step 8: Select the calculated results from Result table to view output
+SELECT * FROM Result ORDER BY Roll;
+
+-- Step 9: Example of using func_GetGrade to get a grade for a specific student
+SELECT Name, total_marks, func_GetGrade(total_marks) AS Grade
+FROM Stud_Marks
+WHERE Roll = 1;
+
+-- Step 10: Clear and re-run with new test data
+TRUNCATE TABLE Result;
+INSERT INTO Stud_Marks (Name, total_marks) VALUES
+('Test Student', 1100);
+CALL proc_Grade();
+SELECT * FROM Result ORDER BY Roll;
